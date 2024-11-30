@@ -1,0 +1,11 @@
+{
+  "name": "stock-analysis",
+  "version": "1.0.0",
+  "description": "stock market analysis tool",
+  "main": "index.js",
+  "author": "Samanth Reddy Chintakuntla <samanthreddys@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "react-scripts start"
+  }
+}
