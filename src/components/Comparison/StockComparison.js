@@ -21,27 +21,58 @@ const MetricsGrid = styled.div`
   margin-top: 20px;
 `;
 
+const StockInput = styled.input`
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  width: 200px;
+  margin-bottom: 20px;
+`;
+
+const ExchangeSelect = styled.select`
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  margin-left: 10px;
+`;
+
+const InputContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+`;
+
 const StockComparison = () => {
   const [stocks, setStocks] = useState([]);
   const [chartInstance, setChartInstance] = useState(null);
   const [metrics, setMetrics] = useState({});
+  const [exchange, setExchange] = useState('NSE');
 
   const addStock = async (symbol) => {
     try {
-      const data = await yahooFinanceService.getHistoricalData(symbol);
-      setStocks([...stocks, { symbol, data }]);
+      console.log('Fetching data for symbol:', symbol);
+      const data = await yahooFinanceService.getHistoricalData(symbol.toUpperCase(), exchange);
       
-      // Fetch metrics
-      const response = await fetch(
-        `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${symbol}?modules=financialData,defaultKeyStatistics`
-      );
-      const metricsData = await response.json();
-      setMetrics(prev => ({
-        ...prev,
-        [symbol]: metricsData.quoteSummary.result[0]
-      }));
+      if (data && data.length > 0) {
+        const fullSymbol = `${symbol.toUpperCase()}.${exchange}`;
+        setStocks(prevStocks => [...prevStocks, { symbol: fullSymbol, data }]);
+        
+        setMetrics(prev => ({
+          ...prev,
+          [fullSymbol]: {
+            lastPrice: data[data.length - 1].close,
+            change: ((data[data.length - 1].close - data[0].close) / data[0].close * 100).toFixed(2)
+          }
+        }));
+      } else {
+        alert(`No data available for ${symbol} on ${exchange}. Please check if the symbol is correct.`);
+      }
     } catch (error) {
       console.error('Error adding stock for comparison:', error);
+      alert(`Error fetching data for ${symbol}. Please check if the symbol is correct.`);
     }
   };
 
@@ -70,14 +101,17 @@ const StockComparison = () => {
         title: stock.symbol,
       });
       
-      // Normalize data to percentage change
-      const firstPrice = stock.data[0].close;
-      const normalizedData = stock.data.map(item => ({
-        time: item.time,
-        value: ((item.close - firstPrice) / firstPrice) * 100
-      }));
-      
-      lineSeries.setData(normalizedData);
+      // Add safety check for data
+      if (stock.data && stock.data.length > 0) {
+        // Normalize data to percentage change
+        const firstPrice = stock.data[0].close;
+        const normalizedData = stock.data.map(item => ({
+          time: item.time,
+          value: ((item.close - firstPrice) / firstPrice) * 100
+        })).filter(item => item.value != null); // Filter out any null values
+        
+        lineSeries.setData(normalizedData);
+      }
     });
 
     setChartInstance(chart);
@@ -89,10 +123,10 @@ const StockComparison = () => {
 
   return (
     <ComparisonContainer>
-      <h2>Stock Comparison</h2>
-      <div>
-        <input
-          placeholder="Add stock symbol"
+      <h2>Indian Stock Comparison</h2>
+      <InputContainer>
+        <StockInput
+          placeholder="Enter stock symbol (e.g., RELIANCE, TCS)"
           onKeyPress={(e) => {
             if (e.key === 'Enter') {
               addStock(e.target.value);
@@ -100,7 +134,14 @@ const StockComparison = () => {
             }
           }}
         />
-      </div>
+        <ExchangeSelect
+          value={exchange}
+          onChange={(e) => setExchange(e.target.value)}
+        >
+          <option value="NS">NSE</option>
+          <option value="BSE">BSE</option>
+        </ExchangeSelect>
+      </InputContainer>
 
       <ChartContainer id="comparisonChart" />
 
@@ -108,7 +149,8 @@ const StockComparison = () => {
         {Object.entries(metrics).map(([symbol, data]) => (
           <div key={symbol}>
             <h3>{symbol}</h3>
-            <div>P/E: {data.financialData.trailingPE?.raw}</div>
+            <div>Last Price: ₹{data.lastPrice?.toFixed(2)}</div>
+            <div>Change: {data.change}%</div>
           </div>
         ))}
       </MetricsGrid>

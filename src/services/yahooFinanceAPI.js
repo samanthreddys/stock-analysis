@@ -1,53 +1,31 @@
-class YahooFinanceService {
-  constructor() {
-    this.baseUrl = 'https://query1.finance.yahoo.com/v8/finance';
-  }
+const API_BASE_URL = 'http://localhost:5000/api';
 
-  // Helper to format Indian stock symbols
-  formatIndianSymbol(symbol, exchange = 'NSE') {
-    // NSE symbols end with .NS, BSE with .BO
-    const suffix = exchange.toUpperCase() === 'NSE' ? '.NS' : '.BO';
-    return `${symbol}${suffix}`;
-  }
+const yahooFinanceService = {
+  formatSymbol: (symbol) => {
+    return symbol.toUpperCase().trim();
+  },
 
-  async getStockQuote(symbol, exchange = 'NSE') {
+  getHistoricalData: async (symbol) => {
     try {
-      const formattedSymbol = this.formatIndianSymbol(symbol, exchange);
-      const response = await fetch(`${this.baseUrl}/quote?symbols=${formattedSymbol}`);
-      return await response.json();
+      const formattedSymbol = yahooFinanceService.formatSymbol(symbol);
+      const response = await fetch(`${API_BASE_URL}/stock/${formattedSymbol}`);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch data');
+      }
+
+      return result.data.map(item => ({
+        time: Math.floor(new Date(item.date).getTime() / 1000),
+        close: item.close
+      }));
+
     } catch (error) {
-      console.error('Error fetching Indian stock quote:', error);
-      throw error;
+      console.error('Error fetching Indian stock data:', error);
+      alert(error.message);
+      return [];
     }
   }
+};
 
-  async getIndianMarketStatus() {
-    try {
-      // Using ^NSEI (Nifty 50) to check market status
-      const response = await fetch(`${this.baseUrl}/quote?symbols=^NSEI`);
-      const data = await response.json();
-      return {
-        isMarketOpen: data.marketState === "REGULAR",
-        lastUpdated: new Date(data.regularMarketTime * 1000),
-        nifty50Value: data.regularMarketPrice
-      };
-    } catch (error) {
-      console.error('Error fetching market status:', error);
-      throw error;
-    }
-  }
-
-  async getIndianIndices() {
-    try {
-      // Fetch major Indian indices
-      const indices = ['^NSEI', '^BSESN', '^CNXBANK', '^CNXAUTO'];
-      const response = await fetch(`${this.baseUrl}/quote?symbols=${indices.join(',')}`);
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching Indian indices:', error);
-      throw error;
-    }
-  }
-}
-
-export default new YahooFinanceService(); 
+export default yahooFinanceService; 
